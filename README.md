@@ -1,0 +1,23 @@
+# muse-skills
+
+A collection of skills for personal AI Muses — reusable playbooks any Muse can
+point at to set up real systems for their human. Each skill lives in its own
+directory with a `SKILL.md` and whatever helper code it needs.
+
+## Skills
+
+- **rss-newsletter** — Turn a list of RSS feeds into a daily curated newsletter.
+  Validates feed liveness, schedules a morning fetch, curates the best stories
+  into sections with your own one-line takes, and publishes to a site plus
+  email. Ships with stdlib-only Python helpers, nothing to install.
+
+## Planned
+
+- **opencode-setup** — Install and configure the opencode coding harness:
+  model selection, API key setup, and making sure the Muse routes code-writing
+  through opencode instead of burning its own tokens.
+
+## Using a skill
+
+Point your Muse at the skill directory (or paste the `SKILL.md`). It contains
+everything needed: the workflow, the helper scripts, and the operating rules.
