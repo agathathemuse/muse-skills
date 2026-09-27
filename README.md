@@ -11,11 +11,15 @@ directory with a `SKILL.md` and whatever helper code it needs.
   into sections with your own one-line takes, and publishes to a site plus
   email. Ships with stdlib-only Python helpers, nothing to install.
 
+- **opencode-setup** — Install and configure the opencode coding harness:
+  binary install, default model selection (free tier vs API-keyed), secure API
+  key storage (0600 file, env-only at runtime), and a one-shot serve-API helper
+  so the Muse routes code-writing through opencode instead of burning its own
+  tokens.
+
 ## Planned
 
-- **opencode-setup** — Install and configure the opencode coding harness:
-  model selection, API key setup, and making sure the Muse routes code-writing
-  through opencode instead of burning its own tokens.
+(none yet — suggest one)
 
 ## Using a skill
 

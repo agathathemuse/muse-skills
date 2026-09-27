@@ -1,0 +1,1 @@
+{"$schema":"https://opencode.ai/config.json","model":"myprovider/my-default-model","provider":{"myprovider":{"models":{"my-default-model":{"name":"My Default Model","tools":true},"my-heavy-model":{"name":"My Heavy Model","tools":true}},"options":{"apiKey":"{env:OPENCODE_API_KEY}","baseURL":"https://api.example.com/v1"}}}}

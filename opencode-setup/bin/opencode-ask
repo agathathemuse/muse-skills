@@ -1,0 +1,52 @@
+#!/bin/bash
+# One-shot opencode prompt via the local serve API.
+# NOTE: `opencode run` hangs in some sandboxed VMs; the serve API is reliable.
+#
+# Usage: opencode-ask [--model provider/model] [--key-file PATH] [--bin PATH] "prompt..."
+#   --model    override the default model for this call (e.g. a heavier keyed model)
+#   --key-file API key file (default: ~/.config/opencode/api.key, 0600)
+#   --bin      opencode binary (default: ~/.opencode/bin/opencode)
+# The default model is read from "model" in ~/.config/opencode/opencode.json.
+# The key file is exported as OPENCODE_API_KEY at runtime only — never logged.
+set -u
+
+KEY_FILE="${OPENCODE_KEY_FILE:-$HOME/.config/opencode/api.key}"
+BIN="${OPENCODE_BIN:-$HOME/.opencode/bin/opencode}"
+MODEL=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model)    MODEL="$2"; shift 2;;
+    --key-file) KEY_FILE="$2"; shift 2;;
+    --bin)      BIN="$2"; shift 2;;
+    *) break;;
+  esac
+done
+PROMPT="$*"
+[ -z "$PROMPT" ] && { echo "usage: opencode-ask [--model provider/model] \"prompt...\"" >&2; exit 1; }
+if [ -z "$MODEL" ]; then
+  MODEL="$(python3 -c "import json;print(json.load(open('$HOME/.config/opencode/opencode.json'))['model'])")"
+fi
+PROVIDER="${MODEL%%/*}"; MODELID="${MODEL#*/}"
+PORT="${OPENCODE_SERVE_PORT:-4096}"
+BASE="http://127.0.0.1:$PORT"
+
+pkill -f '[o]pencode serve' 2>/dev/null; sleep 1
+if [ -f "$KEY_FILE" ]; then
+  export OPENCODE_API_KEY="$(cat "$KEY_FILE")"
+fi
+(setsid "$BIN" serve --port "$PORT" > /tmp/opencode-ask-serve.log 2>&1 < /dev/null &)
+for _ in $(seq 1 30); do
+  curl -s -m 2 "$BASE/global/health" | grep -q '"healthy":true' && break
+  sleep 1
+done
+SID="$(curl -s -m 10 -X POST "$BASE/session" -H 'Content-Type: application/json' \
+  -d '{"title":"ask"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")"
+BODY="$(python3 -c "import sys,json; print(json.dumps({'model':{'providerID':'$PROVIDER','modelID':'$MODELID'},'parts':[{'type':'text','text':sys.argv[1]}]}))" "$PROMPT")"
+curl -s -m 300 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
+  -d "$BODY" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print(p.get('text'))
+"
+pkill -f '[o]pencode serve' 2>/dev/null
