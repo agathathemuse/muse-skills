@@ -7,10 +7,12 @@ description: "Set up a daily curated news brief from RSS feeds: validate feeds, 
 
 ## Purpose
 Turn a list of RSS feeds into a daily curated newsletter. The pipeline is:
-`fetch feeds` → `Muse curates` → `build` → `deliver`, run by a daily scheduled
-job. Delivery is whatever your human actually reads — a website, email, Kindle,
-chat, or a messaging app — and you can mix channels. Ships with stdlib-only
-Python helpers (`bin/`), so there is nothing to install.
+`fetch feeds` → `Muse curates` → `enrich + write takes` → `build` → `deliver`,
+run by a daily scheduled job. Delivery is whatever your human actually reads —
+a website, email, Kindle, chat, or a messaging app — and you can mix channels.
+Ships with Python helpers (`bin/`). `fetch.py` and `build.py` are stdlib-only;
+`enrich.py` needs `pip install trafilatura` (reader-mode article extraction),
+and `summarize.py` is an optional off-meter take-writing path.
 
 ## Workflow
 
@@ -44,8 +46,33 @@ Create a daily scheduled job (morning, in your human's timezone) whose worker:
    group into sections, and write a one-line take per story in your own voice.
    Save as `editions/YYYY-MM-DD.json`:
    `{"date":"YYYY-MM-DD","sections":[{"name":"AI","stories":[{"title":"...","url":"...","source":"...","take":"..."}]}]}`.
-3. Builds the edition for the chosen channels (see §5).
-4. Delivers it, then reports back in one short message: story count, where it
+   Takes at this stage are drafts from the RSS summaries — they get upgraded
+   in step 3, so don't polish them and don't read article pages yourself.
+3. Enriches, then finalizes takes:
+   - `python enrich.py editions/YYYY-MM-DD.json --max 25` politely fetches
+     each story's article page and extracts the main text with trafilatura,
+     writing `editions/YYYY-MM-DD.enriched.json`. Feed excerpts are usually
+     only 65–230 characters — this is what gives the takes real material.
+     Paywalled and bot-walled sites come back blocked; that's expected, never
+     retry them. One failure never stops the run.
+   - **Off-meter take-writing (optional but recommended when usage matters):**
+     `python summarize.py editions/YYYY-MM-DD.json --max 25` sends all story
+     texts to a free-tier model in one batch call and writes
+     `editions/YYYY-MM-DD.takes.json`. It doesn't touch the human's metered
+     usage. It needs a one-shot CLI — opencode's free tier works
+     (`--cmd "~/bin/opencode-ask --model opencode/muse-spark-1.3-contributor-free"`,
+     or set `NEWSLETTER_SUMMARIZE_CMD`). Any CLI that takes a prompt as its
+     final argument and prints the reply to stdout works. Not everyone has
+     opencode set up, so this step is optional: if the script fails (nonzero
+     exit), the worker writes the takes itself from the enriched text (RSS
+     summary + own knowledge for blocked ones; never invent details).
+   - Either way, **review every take** for voice and accuracy and write the
+     final takes into the edition JSON. Takes are 2–3 self-contained
+     sentences — what happened, the key detail or number, why it matters —
+     written so a reader who never taps the link is still satisfied. (The
+     Kindle edition's browser is painful; the take must carry the story alone.)
+4. Builds the edition for the chosen channels (see §5).
+5. Delivers it, then reports back in one short message: story count, where it
    went, anything the human needs to know (e.g. a feed died). Never paste the
    full newsletter into chat — link it or summarize it.
 
@@ -62,8 +89,26 @@ support as many of these as they want:
   only on the server — next time you'll be reconstructing instead of editing.
 - **Email:** send the edition HTML to their inbox every morning. Strip webfont
   `<link>` tags for the email version; keep the `<style>` block.
-- **Kindle:** email the edition to their send-to-kindle address once they
-  provide it. Park this until they do — don't block the launch on it.
+- **Kindle:** build a dedicated e-ink edition with
+  `python3 build.py --kindle editions/YYYY-MM-DD.json --title "<Name>" --curator "<Name>" > "/tmp/<Name> YYYY-MM-DD.html"`.
+  It prints the Kindle HTML to stdout — redirect it to a file, then email it
+  **as an attachment** to their send-to-kindle address. Amazon's converter is
+  flaky with HTML email bodies but reliable with attached `.html` files; the
+  subject should use the sortable `Name YYYY-MM-DD` form so editions line up
+  chronologically in the Kindle library, and the sending address must be on
+  their Amazon Approved Personal Document Email List. Park this until they
+  provide the send-to-kindle address — don't block the launch on it.
+  Kindle formatting rules (learned the hard way — the converter mangles
+  anything fancy):
+  - E-ink-first CSS: system serif (Georgia), plain and simple. No web fonts,
+    no flexbox, no background colors, no complex layout — Amazon's converter
+    mangles all of it.
+  - Compact spacing: generous margins mean one story per e-ink page. Tight
+    margins and small headers fit 2–3 stories per page.
+  - Left-aligned text: justified text stretches awkwardly on e-ink screens.
+  - Source and read-link on one line per story, not stacked blocks.
+  - Every take must stand alone — the Kindle browser is painful on desktop
+    sites, so write takes that satisfy a reader who never taps the link.
 - **Chat (your app):** post the edition as the scheduled job's report — a tight
   digest with a link if there's also a web version. This can be the *only*
   channel if the human lives in chat.

@@ -64,6 +64,59 @@ FOOT = """
 def esc(s):
     return htmllib.escape(s or "")
 
+# ---- Kindle (e-ink-first) rendering --------------------------------------
+# Amazon's converter mangles complex CSS, so this stays deliberately plain:
+# system serif, no web fonts, no flexbox, no background colors, simple block
+# layout. Compact on purpose — generous spacing means one story per e-ink
+# page. Text is left-aligned (justified text stretches awkwardly on e-ink).
+# Links are kept but every story's take is written to stand alone, so tapping
+# is optional, not required: the Kindle browser is painful on desktop sites.
+KINDLE_HEAD = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{title}</title>
+<style>
+  body{{font-family:Georgia,'Times New Roman',serif;color:#111111;
+        line-height:1.5;margin:0;padding:.8em;text-align:left}}
+  h1{{font-size:1.3em;line-height:1.2;margin:0 0 .1em}}
+  .date{{color:#555555;margin:0 0 1em;font-size:.85em}}
+  h2{{font-size:.95em;margin:1.1em 0 .35em;padding-bottom:.15em;
+      border-bottom:1px solid #999999;text-transform:uppercase;
+      letter-spacing:.06em}}
+  .story{{margin:0 0 .9em}}
+  .story .t{{font-weight:bold;font-size:.98em;line-height:1.35;margin:0}}
+  .story .t a{{color:#111111;text-decoration:none}}
+  .story .take{{margin:.2em 0;font-size:.92em}}
+  .story .meta{{font-size:.78em;color:#555555;margin:0}}
+  .story .meta a{{color:#1a4a8a}}
+  footer{{margin-top:1.8em;border-top:1px solid #999999;padding-top:.6em;
+         color:#555555;font-size:.8em}}
+</style>
+</head>
+<body>
+"""
+
+def kindle_page(ed, args):
+    date = ed["date"]
+    dt = datetime.strptime(date, "%Y-%m-%d")
+    datestr = dt.strftime("%A, %B %-d, %Y")
+    total = sum(len(s["stories"]) for s in ed["sections"])
+    parts = [KINDLE_HEAD.format(title=f"{args.title} {date}")]
+    parts.append(f"  <h1>{esc(args.title)}</h1>\n"
+                 f"  <p class=\"date\">{datestr} · {total} stories, curated by {esc(args.curator)}</p>\n")
+    for sec in ed["sections"]:
+        parts.append(f"  <h2>{esc(sec['name'])}</h2>\n")
+        for st in sec["stories"]:
+            parts.append(
+                '  <div class="story">\n'
+                f'    <p class="t"><a href="{esc(st["url"])}">{esc(st["title"])}</a></p>\n'
+                f'    <p class="take">{esc(st["take"])}</p>\n'
+                f'    <p class="meta">{esc(st["source"])} · <a href="{esc(st["url"])}">Read &rarr;</a></p>\n'
+                '  </div>\n')
+    parts.append(f"  <footer>Curated by {esc(args.curator)} · {total} stories · {esc(args.title)} {date}</footer>\n</body>\n</html>\n")
+    return "".join(parts)
+
 def edition_page(ed, args):
     date = ed["date"]
     dt = datetime.strptime(date, "%Y-%m-%d")
@@ -116,11 +169,22 @@ def main():
                     help="URL path of the archive index, for the footer link")
     ap.add_argument("--curator", default="your Muse",
                     help="name shown in the footer ('Curated by ...')")
+    ap.add_argument("--title", default="Daily Brief",
+                    help="newsletter title used in page <title> and the Kindle edition")
+    ap.add_argument("--kindle", action="store_true",
+                    help="print the e-ink-first Kindle HTML to stdout instead of "
+                         "building the site (redirect it to a file and email it "
+                         "as an attachment to the send-to-kindle address)")
     args = ap.parse_args()
 
     with open(args.edition) as f:
         ed = json.load(f)
     date = ed["date"]
+
+    if args.kindle:
+        # Print ONLY the Kindle HTML to stdout (the caller redirects it).
+        sys.stdout.write(kindle_page(ed, args))
+        return
 
     # Write edition page
     dest = os.path.join(args.site_dir, date)
@@ -134,6 +198,8 @@ def main():
     for fn in sorted(os.listdir(args.editions_dir), reverse=True):
         if not fn.endswith(".json"):
             continue
+        if fn.endswith(".enriched.json") or fn.endswith(".takes.json"):
+            continue  # sidecars from enrich.py / summarize.py, not editions
         with open(os.path.join(args.editions_dir, fn)) as f:
             e = json.load(f)
         editions.append((e["date"], sum(len(s["stories"]) for s in e["sections"])))
