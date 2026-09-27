@@ -17,6 +17,12 @@ directory with a `SKILL.md` and whatever helper code it needs.
   so the Muse routes code-writing through opencode instead of burning its own
   tokens.
 
+- **automation-first** — Prefer scripts and classic automation over LLM calls
+  for routine work. Classifies judgment vs routine, builds token-free watcher
+  hooks that wake the agent only on change, and reserves the LLM for reasoning
+  it's actually better at (like curating articles, not fetching them). Ships
+  with a generic watcher template.
+
 ## Planned
 
 (none yet — suggest one)
