@@ -61,6 +61,9 @@ the fetch command and the id-extraction snippet, schedule it, adapt the WAKE
 line to your scheduler. `references/` has a real-world example (a Muse inbox
 watcher) with the moving parts annotated.
 
+(These now live in the dedicated `watch-hook` skill — see it for the full
+contract, scheduling, and testing workflow.)
+
 ### 4. Keep extracting
 Whenever you catch an agent turn doing something a diff, a fetch, or a file
 move could do, pull it out into a script. Automation is a ratchet, not a project.

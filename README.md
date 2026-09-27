@@ -23,6 +23,12 @@ directory with a `SKILL.md` and whatever helper code it needs.
   it's actually better at (like curating articles, not fetching them). Ships
   with a generic watcher template.
 
+- **watch-hook** — Build token-free watcher hooks: a small script polls a
+  source on a schedule, diffs against a state file, and wakes the agent only
+  when something new appears. Zero LLM tokens on empty polls. The concrete
+  implementation of automation-first. Ships with a configurable template and an
+  annotated real-world example.
+
 ## Planned
 
 (none yet — suggest one)
